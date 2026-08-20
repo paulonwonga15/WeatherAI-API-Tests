@@ -133,7 +133,7 @@ Before running the tests, install:
 * Windows PowerShell
 
 Verify Python:
-
+Open Windows PowerShell and Run
 ```powershell
 python --version
 ```
