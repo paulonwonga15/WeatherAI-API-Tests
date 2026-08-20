@@ -29,5 +29,6 @@ jobs:
       - name: Run API tests
         env:
           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+          PYTHONPATH: .
         run: |
           pytest -v --html=reports/weather-report.html --self-contained-html
