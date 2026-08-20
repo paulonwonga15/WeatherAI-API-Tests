@@ -4,6 +4,23 @@ import time
 
 
 # ============================================================
+# TEST OUTPUT HELPER
+# ============================================================
+
+def print_response(label, response):
+    print(f"\n{'=' * 60}")
+    print(label)
+    print(f"Status code: {response.status_code}")
+
+    try:
+        print(f"Response: {response.json()}")
+    except ValueError:
+        print(f"Response: {response.text}")
+
+    print(f"{'=' * 60}")
+
+
+# ============================================================
 # CORE WEATHER API / SUCCESS CASES
 # ============================================================
 
@@ -17,25 +34,22 @@ def test_get_weather_success():
         days=7
     )
 
-    # HTTP status
+    print_response("Successful weather request - Nairobi", response)
+
     assert response.status_code == 200
 
-    # Response must be JSON
     data = response.json()
     assert isinstance(data, dict)
 
-    # Required top-level fields
     assert "lat" in data
     assert "lon" in data
     assert "current" in data
     assert "daily" in data
     assert "hourly" in data
 
-    # Location should match the request
     assert data["lat"] == -1.2921
     assert data["lon"] == 36.8219
 
-    # Current weather required fields
     current = data["current"]
 
     assert "time" in current
@@ -43,14 +57,11 @@ def test_get_weather_success():
     assert "windspeed" in current
     assert "weathercode" in current
 
-    # Temperature should be numeric
     assert isinstance(current["temperature"], (int, float))
 
-    # Daily forecast should contain 7 days
     assert isinstance(data["daily"], list)
     assert len(data["daily"]) == 7
 
-    # Validate required daily forecast fields
     for day in data["daily"]:
         assert "date" in day
         assert "temp_max" in day
@@ -68,18 +79,18 @@ def test_weather_data_quality():
         days=7
     )
 
+    print_response("Weather data quality - Nairobi", response)
+
     assert response.status_code == 200
 
     data = response.json()
 
-    # Validate current weather
     current = data["current"]
 
     assert isinstance(current["temperature"], (int, float))
     assert isinstance(current["windspeed"], (int, float))
     assert current["windspeed"] >= 0
 
-    # Validate daily forecast data
     for day in data["daily"]:
         assert day["temp_max"] >= day["temp_min"]
         assert isinstance(day["precipitation"], (int, float))
@@ -105,6 +116,8 @@ def test_weather_multiple_locations(city, lat, lon):
         days=7
     )
 
+    print_response(f"Multiple location test - {city}", response)
+
     assert response.status_code == 200
 
     data = response.json()
@@ -115,10 +128,11 @@ def test_weather_multiple_locations(city, lat, lon):
     assert isinstance(data["current"]["temperature"], (int, float))
     assert len(data["daily"]) == 7
 
+
 # ============================================================
 # PERFORMANCE TESTING
-# Verifies API response time for a standard weather request.
 # ============================================================
+
 def test_weather_response_time():
     client = WeatherAIClient()
 
@@ -133,13 +147,15 @@ def test_weather_response_time():
 
     response_time = time.perf_counter() - start_time
 
+    print_response("API response time test", response)
+    print(f"API response time: {response_time:.2f} seconds")
+
     assert response.status_code == 200
+
     assert response_time < 5, (
         f"API response took {response_time:.2f} seconds, "
         f"which exceeds the 5-second threshold"
     )
-
-    print(f"\nAPI response time: {response_time:.2f} seconds")
 
 
 # ============================================================
@@ -149,7 +165,6 @@ def test_weather_response_time():
 def test_invalid_api_key():
     client = WeatherAIClient()
 
-    # Replace valid API key with deliberately invalid key
     client.headers["Authorization"] = "Bearer wai_invalid_test_key"
 
     response = client.get_weather(
@@ -158,6 +173,8 @@ def test_invalid_api_key():
         units="metric",
         days=7
     )
+
+    print_response("Invalid API key authentication test", response)
 
     assert response.status_code == 401, (
         f"Expected 401 Unauthorized for invalid API key, "
@@ -179,7 +196,9 @@ def test_invalid_latitude():
         days=7
     )
 
-    # WeatherAI currently returns 502 for out-of-range latitude
+    print_response("Invalid latitude - lat=200", response)
+
+    # Observed WeatherAI behavior: 502
     assert response.status_code == 502
 
 
@@ -193,7 +212,9 @@ def test_invalid_longitude():
         days=7
     )
 
-    # WeatherAI currently returns 502 for out-of-range longitude
+    print_response("Invalid longitude - lon=250", response)
+
+    # Observed WeatherAI behavior: 502
     assert response.status_code == 502
 
 
@@ -205,6 +226,8 @@ def test_missing_latitude():
         units="metric",
         days=7
     )
+
+    print_response("Missing latitude", response)
 
     assert response.status_code == 400, (
         f"Expected 400 Bad Request when latitude is missing, "
@@ -220,6 +243,8 @@ def test_missing_longitude():
         units="metric",
         days=7
     )
+
+    print_response("Missing longitude", response)
 
     assert response.status_code == 400, (
         f"Expected 400 Bad Request when longitude is missing, "
@@ -237,7 +262,9 @@ def test_invalid_latitude_type():
         days=7
     )
 
-    assert response.status_code >= 400
+    print_response("Invalid latitude type - lat='abc'", response)
+
+    assert response.status_code == 400
 
 
 def test_invalid_longitude_type():
@@ -250,7 +277,9 @@ def test_invalid_longitude_type():
         days=7
     )
 
-    assert response.status_code >= 400
+    print_response("Invalid longitude type - lon='abc'", response)
+
+    assert response.status_code == 400
 
 
 def test_empty_latitude_is_handled():
@@ -263,7 +292,9 @@ def test_empty_latitude_is_handled():
         days=7
     )
 
-    # Current API behavior: empty latitude is accepted
+    print_response("Empty latitude - lat=''", response)
+
+    # Observed API behavior: accepted
     assert response.status_code == 200
 
     data = response.json()
@@ -283,7 +314,9 @@ def test_empty_longitude_is_handled():
         days=7
     )
 
-    # Current API behavior: empty longitude is accepted
+    print_response("Empty longitude - lon=''", response)
+
+    # Observed API behavior: accepted
     assert response.status_code == 200
 
     data = response.json()
@@ -303,6 +336,8 @@ def test_latitude_upper_boundary():
         days=7
     )
 
+    print_response("Latitude upper boundary - lat=90", response)
+
     assert response.status_code == 200
 
 
@@ -315,6 +350,8 @@ def test_latitude_lower_boundary():
         units="metric",
         days=7
     )
+
+    print_response("Latitude lower boundary - lat=-90", response)
 
     assert response.status_code == 200
 
@@ -329,6 +366,8 @@ def test_longitude_upper_boundary():
         days=7
     )
 
+    print_response("Longitude upper boundary - lon=180", response)
+
     assert response.status_code == 200
 
 
@@ -341,6 +380,8 @@ def test_longitude_lower_boundary():
         units="metric",
         days=7
     )
+
+    print_response("Longitude lower boundary - lon=-180", response)
 
     assert response.status_code == 200
 
@@ -355,6 +396,8 @@ def test_zero_coordinates():
         days=7
     )
 
+    print_response("Zero coordinates - lat=0, lon=0", response)
+
     assert response.status_code == 200
 
 
@@ -368,12 +411,13 @@ def test_very_large_coordinates():
         days=7
     )
 
-    assert response.status_code >= 400
-
-    print(
-        f"\nVery large coordinates response: "
-        f"{response.status_code}"
+    print_response(
+        "Very large coordinates - lat=999999, lon=999999",
+        response
     )
+
+    # Observed API behavior: 502 Bad gateway
+    assert response.status_code == 502
 
 
 def test_boolean_coordinates():
@@ -386,14 +430,12 @@ def test_boolean_coordinates():
         days=7
     )
 
-    # Python treats booleans as integers.
-    # This verifies the API rejects boolean coordinates.
-    assert response.status_code >= 400
-
-    print(
-        f"\nBoolean coordinates response: "
-        f"{response.status_code}"
+    print_response(
+        "Boolean coordinates - lat=True, lon=False",
+        response
     )
+
+    assert response.status_code >= 400
 
 
 # ============================================================
@@ -407,6 +449,8 @@ def test_weather_default_parameters():
         lat=-1.2921,
         lon=36.8219
     )
+
+    print_response("Default forecast parameters", response)
 
     assert response.status_code == 200
 
@@ -428,6 +472,8 @@ def test_weather_one_day_forecast():
         days=1
     )
 
+    print_response("One-day forecast - days=1", response)
+
     assert response.status_code == 200
 
     data = response.json()
@@ -445,6 +491,8 @@ def test_weather_seven_day_forecast():
         units="metric",
         days=7
     )
+
+    print_response("Seven-day forecast - days=7", response)
 
     assert response.status_code == 200
 
@@ -464,9 +512,13 @@ def test_days_zero_is_normalized():
         days=0
     )
 
+    print_response("Zero forecast days - days=0", response)
+
     assert response.status_code == 200
 
     data = response.json()
+
+    print(f"Normalized days value: {data.get('days')}")
 
     assert data["days"] == 7
     assert len(data["daily"]) == 7
@@ -482,9 +534,13 @@ def test_days_above_maximum_is_normalized():
         days=8
     )
 
+    print_response("Days above maximum - days=8", response)
+
     assert response.status_code == 200
 
     data = response.json()
+
+    print(f"Normalized days value: {data.get('days')}")
 
     assert data["days"] == 7
     assert len(data["daily"]) == 7
@@ -500,11 +556,13 @@ def test_negative_days():
         days=-1
     )
 
+    print_response("Negative forecast days - days=-1", response)
+
     assert response.status_code == 200
 
     data = response.json()
 
-    print("\nNegative days normalized to:", data.get("days"))
+    print(f"Normalized days value: {data.get('days')}")
 
     assert isinstance(data["days"], int)
     assert data["days"] >= 1
@@ -520,10 +578,11 @@ def test_invalid_days_type():
         days="abc"
     )
 
-    print(
-        "Invalid days normalized to:",
-        response.json().get("days")
-    )
+    print_response("Invalid days type - days='abc'", response)
+
+    data = response.json()
+
+    print(f"Normalized days value: {data.get('days')}")
 
     assert response.status_code == 200
 
@@ -538,10 +597,11 @@ def test_empty_days():
         days=""
     )
 
-    print(
-        "Empty days normalized to:",
-        response.json().get("days")
-    )
+    print_response("Empty days - days=''", response)
+
+    data = response.json()
+
+    print(f"Normalized days value: {data.get('days')}")
 
     assert response.status_code == 200
 
@@ -556,7 +616,9 @@ def test_decimal_days():
         days=3.5
     )
 
-    # WeatherAI currently returns 502 for decimal days
+    print_response("Decimal forecast days - days=3.5", response)
+
+    # Observed WeatherAI behavior: 502
     assert response.status_code == 502, (
         f"Expected 502 for decimal days, "
         f"but received {response.status_code}: {response.text}"
@@ -577,6 +639,8 @@ def test_weather_imperial_units():
         days=7
     )
 
+    print_response("Imperial units", response)
+
     assert response.status_code == 200
 
     data = response.json()
@@ -595,13 +659,14 @@ def test_invalid_units_value():
         days=7
     )
 
+    print_response("Invalid units - units='invalid'", response)
+
     assert response.status_code == 200
 
     data = response.json()
 
-    print("\nInvalid units response:", data.get("units"))
+    print(f"Normalized units value: {data.get('units')}")
 
-    # Current API behavior: invalid value is normalized
     assert data["units"] in ["metric", "imperial"]
 
 
@@ -615,13 +680,14 @@ def test_empty_units():
         days=7
     )
 
+    print_response("Empty units - units=''", response)
+
     assert response.status_code == 200
 
     data = response.json()
 
-    print("\nEmpty units normalized to:", data.get("units"))
+    print(f"Normalized units value: {data.get('units')}")
 
-    # Current API behavior: empty value is normalized
     assert data["units"] in ["metric", "imperial"]
 
 
@@ -636,13 +702,17 @@ def test_units_case_sensitivity(units):
         days=7
     )
 
+    print_response(
+        f"Units case variation - units='{units}'",
+        response
+    )
+
     assert response.status_code == 200
 
     data = response.json()
 
-    print(f"\nUnits '{units}' returned:", data.get("units"))
+    print(f"Normalized units value: {data.get('units')}")
 
-    # Current API behavior: case variation is accepted/normalized
     assert data["units"] in ["metric", "imperial"]
 
 
@@ -660,6 +730,8 @@ def test_weather_ai_disabled():
         days=7,
         ai="false"
     )
+
+    print_response("AI disabled - ai='false'", response)
 
     assert response.status_code == 200
 
@@ -681,6 +753,8 @@ def test_extra_unknown_parameter():
         foo="bar"
     )
 
+    print_response("Unknown parameter - foo='bar'", response)
+
     assert response.status_code == 200
 
     data = response.json()
@@ -689,7 +763,7 @@ def test_extra_unknown_parameter():
     assert "daily" in data
     assert "hourly" in data
 
-    print("\nExtra parameter accepted successfully")
+    print("Extra parameter accepted successfully")
 
 
 # ============================================================
@@ -706,13 +780,16 @@ def test_weather_response_is_json():
         days=7
     )
 
+    print_response("JSON response validation", response)
+
     assert response.status_code == 200
 
     content_type = response.headers.get("Content-Type", "").lower()
+
+    print(f"Content-Type: {content_type}")
 
     assert "application/json" in content_type
 
     data = response.json()
 
     assert isinstance(data, dict)
-
